@@ -1,14 +1,18 @@
 """Generate the wiring diagram for the PCAH video wall.
 
-Writes the diagram to diagrams/ in three formats: .excalidraw (editable),
-.drawio (editable in diagrams.net), and .svg (read-only, embedded in the
-README). Uses only the standard library.
+Writes the diagram to diagrams/ in four formats: .excalidraw (editable),
+.drawio (editable in diagrams.net), .svg (read-only, embedded in the README),
+and .png with the draw.io diagram embedded (downloadable and still editable).
+Uses only the standard library; the PNG export shells out to the draw.io
+desktop app and is skipped if it isn't installed.
 
 Run: python3 generate_diagrams.py
 """
 
 import json
 import random
+import shutil
+import subprocess
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -465,6 +469,26 @@ def video_wall():
     return d
 
 
+DRAWIO_BINARIES = ("drawio", "/Applications/draw.io.app/Contents/MacOS/draw.io")
+
+
+def export_editable_png(drawio_path, png_path):
+    """Render a PNG with the draw.io diagram embedded, so the PNG itself is editable.
+
+    Returns False (with a notice) when the draw.io desktop app isn't installed.
+    """
+    binary = next((b for b in DRAWIO_BINARIES if shutil.which(b)), None)
+    if binary is None:
+        print("draw.io app not found — skipped PNG export (install draw.io desktop to enable)")
+        return False
+    subprocess.run(
+        [binary, "-x", "-f", "png", "-s", "2", "--embed-diagram", "-o", png_path, drawio_path],
+        check=True,
+        capture_output=True,
+    )
+    return True
+
+
 def main():
     out = Path(__file__).parent / "diagrams"
     out.mkdir(exist_ok=True)
@@ -474,7 +498,10 @@ def main():
     diagram.save(out / f"{name}.excalidraw")
     (out / f"{name}.svg").write_text(render_svg(diagram.elements))
     (out / f"{name}.drawio").write_text(render_drawio(diagram.elements, name))
-    print(f"wrote diagrams/{name}.{{excalidraw,svg,drawio}} ({len(diagram.elements)} elements)")
+    formats = "{excalidraw,svg,drawio,png}"
+    if not export_editable_png(str(out / f"{name}.drawio"), str(out / f"{name}.png")):
+        formats = "{excalidraw,svg,drawio}"
+    print(f"wrote diagrams/{name}.{formats} ({len(diagram.elements)} elements)")
 
 
 if __name__ == "__main__":

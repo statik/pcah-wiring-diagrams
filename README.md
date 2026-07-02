@@ -16,15 +16,21 @@ How each display is wired:
 
 ![PCAH video wall wiring diagram](diagrams/pcah-video-wall.svg)
 
+**[Download the PNG](diagrams/pcah-video-wall.png?raw=true)** — the draw.io
+diagram is embedded inside the PNG, so the image can be shared anywhere and
+still opened for editing at [app.diagrams.net](https://app.diagrams.net).
+
 ## Formats and editing
 
-The diagram ships in three formats in `diagrams/`:
+The diagram ships in four formats in `diagrams/`:
 
 - **`pcah-video-wall.excalidraw`** — open at [excalidraw.com](https://excalidraw.com)
   (File → Open, or drag the file in), in VS Code with the Excalidraw extension,
   or in Obsidian.
 - **`pcah-video-wall.drawio`** — open at [app.diagrams.net](https://app.diagrams.net)
   or in the draw.io desktop app.
+- **`pcah-video-wall.png`** — downloadable image with the draw.io diagram
+  embedded; drag it into app.diagrams.net to edit.
 - **`pcah-video-wall.svg`** — read-only export, embedded above and viewable in
   any browser.
 
