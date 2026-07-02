@@ -1,6 +1,6 @@
 # PCAH Wiring Diagrams
 
-The wiring diagram for the PCAH video wall: an SDI source daisy-chained through
+The wiring diagram for the PCAH video tactile area: an SDI source daisy-chained through
 a Blackmagic SDI→HDMI converter at each of 10 displays, arranged in three
 clusters (3 top-left, 3 top-right, 4 below), with shared power distribution.
 
