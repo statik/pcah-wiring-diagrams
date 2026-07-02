@@ -1,0 +1,58 @@
+name: Export diagrams
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "diagrams/*.drawio"
+      - "export_diagrams.py"
+      - ".github/workflows/export-diagrams.yml"
+
+concurrency:
+  group: export-diagrams
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install draw.io desktop and xvfb
+        env:
+          DRAWIO_VERSION: 30.2.6
+        run: |
+          curl -fsSL -o /tmp/drawio.deb \
+            "https://github.com/jgraph/drawio-desktop/releases/download/v${DRAWIO_VERSION}/drawio-amd64-${DRAWIO_VERSION}.deb"
+          sudo apt-get update
+          sudo apt-get install -y /tmp/drawio.deb xvfb
+
+      - name: Wrap drawio for headless export
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/usr/bin/env bash\nexec xvfb-run -a /opt/drawio/drawio --no-sandbox --disable-gpu --disable-dev-shm-usage "$@"\n' \
+            > "$HOME/.local/bin/drawio"
+          chmod +x "$HOME/.local/bin/drawio"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Export diagrams
+        run: python3 export_diagrams.py
+
+      - name: Commit and push regenerated exports
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet -- diagrams; then
+            echo "Exports already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898024+github-actions[bot]@users.noreply.github.com"
+          git add diagrams
+          git commit -m "Re-export diagrams from draw.io master"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main

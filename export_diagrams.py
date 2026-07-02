@@ -175,13 +175,13 @@ class Diagram:
     def line(self, pts, color, *, width=2):
         return self._linear("line", pts, color, None, width)
 
-    def save(self, path):
+    def save(self, path, background="#ffffff"):
         doc = {
             "type": "excalidraw",
             "version": 2,
             "source": "pcah-wiring-diagrams export_diagrams.py",
             "elements": self.elements,
-            "appState": {"gridSize": 20, "viewBackgroundColor": "#ffffff"},
+            "appState": {"gridSize": 20, "viewBackgroundColor": background},
             "files": {},
         }
         path.write_text(json.dumps(doc, indent=2) + "\n")
@@ -203,14 +203,14 @@ def validate(diagram):
             raise ValueError(f"element {el['id']} has dangling references: {missing}")
 
 
-def load_cells(path):
-    """Return the mxCell elements from a .drawio file (compressed or plain)."""
+def load_model(path):
+    """Return (mxCell elements, background color) from a .drawio file (compressed or plain)."""
     diagram = ET.parse(path).getroot().find("diagram")
     model = diagram.find("mxGraphModel")
     if model is None:
         packed = base64.b64decode(diagram.text.strip())
         model = ET.fromstring(urllib.parse.unquote(zlib.decompress(packed, -15).decode()))
-    return model.find("root").findall("mxCell")
+    return model.find("root").findall("mxCell"), model.get("background", "#ffffff")
 
 
 def parse_style(style):
@@ -330,7 +330,7 @@ def convert_to_excalidraw(cells):
     return d
 
 
-def export_via_drawio(master):
+def export_via_drawio(master, background):
     """Render SVG and editable PNG with the draw.io CLI; skip if not installed."""
     binary = next((b for b in DRAWIO_BINARIES if shutil.which(b)), None)
     if binary is None:
@@ -349,7 +349,7 @@ def export_via_drawio(master):
     svg_path = master.with_suffix(".svg")
     svg = re.sub(
         r"(<svg[^>]*>)",
-        r'\1<rect fill="#ffffff" width="100%" height="100%"/>',
+        rf'\1<rect fill="{background}" width="100%" height="100%"/>',
         svg_path.read_text(),
         count=1,
     )
@@ -359,10 +359,11 @@ def export_via_drawio(master):
 
 def main():
     master = Path(__file__).parent / "diagrams" / "pcah-video-wall.drawio"
-    diagram = convert_to_excalidraw(load_cells(master))
+    cells, background = load_model(master)
+    diagram = convert_to_excalidraw(cells)
     validate(diagram)
-    diagram.save(master.with_suffix(".excalidraw"))
-    formats = "{excalidraw,svg,png}" if export_via_drawio(master) else "{excalidraw}"
+    diagram.save(master.with_suffix(".excalidraw"), background)
+    formats = "{excalidraw,svg,png}" if export_via_drawio(master, background) else "{excalidraw}"
     print(f"exported diagrams/pcah-video-wall.{formats} from the .drawio master")
 
 

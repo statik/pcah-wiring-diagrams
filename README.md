@@ -29,8 +29,10 @@ still opened for editing at [app.diagrams.net](https://app.diagrams.net).
 
 **`diagrams/pcah-video-wall.drawio` is the source of truth.** Edit it with the
 "Open in draw.io" link above (the GitHub-connected variant commits straight
-back to this repo) or in the draw.io desktop app, then regenerate the derived
-formats:
+back to this repo) or in the draw.io desktop app. A
+[GitHub Action](.github/workflows/export-diagrams.yml) re-exports the derived
+formats automatically whenever a push to `main` changes the `.drawio` file, so
+browser edits stay in sync on their own. To regenerate locally instead:
 
 ```sh
 python3 export_diagrams.py
