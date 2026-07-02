@@ -8,11 +8,10 @@ How each display is wired:
 
 - **Red** — electric power from the wall feeds, through 8-way power splitters,
   to each TV.
-- **Blue** — the SDI video feed, daisy-chained converter to converter through
-  their SDI through ports.
-- **Green** — the HDMI cable into the TV plus the USB-A → USB-C cable the
-  converter uses to draw power from the TV; the arrowhead shows that power
-  draw, from the TV into the converter.
+- **Blue** — video: the SDI feed daisy-chained converter to converter through
+  their SDI through ports, and the HDMI feed from each converter into its TV.
+- **Green** — the USB-A → USB-C cable the converter uses to draw power from
+  the TV; the arrowhead points into the converter to show that power draw.
 
 ![PCAH video wall wiring diagram](diagrams/pcah-video-wall.svg)
 
