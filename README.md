@@ -15,23 +15,43 @@ How each display is wired:
 - **Orange** — USB-A → USB-C cable from the TV's USB port back to the
   converter, which is how the converter gets its power.
 
-The diagrams are [Excalidraw](https://excalidraw.com) files in `diagrams/`:
+Each diagram in `diagrams/` comes in three formats:
 
-| File | What it shows |
+| Diagram | What it shows |
 |------|---------------|
-| `01-power-distribution.excalidraw` | Electric power only: two feeds and three 8-way splitters powering the 10 TVs |
-| `02-sdi-daisy-chain.excalidraw` | Earlier 8-display design option: daisy chain with wall-powered converters |
-| `03-sdi-distribution-amps.excalidraw` | Earlier 8-display design option: SDI source into 1→4 distribution amps |
-| `04-full-system.excalidraw` | The whole system: power, SDI daisy chain, HDMI, and USB power for all 10 displays |
+| `01-power-distribution` | Electric power only: two feeds and three 8-way splitters powering the 10 TVs |
+| `02-sdi-daisy-chain` | Earlier 8-display design option: daisy chain with wall-powered converters |
+| `03-sdi-distribution-amps` | Earlier 8-display design option: SDI source into 1→4 distribution amps |
+| `04-full-system` | The whole system: power, SDI daisy chain, HDMI, and USB power for all 10 displays |
 
-## Editing
+## Full system
 
-Any of these work — no account or install-to-server needed:
+![Full system](diagrams/04-full-system.svg)
 
-- **excalidraw.com** — open the site, then File → Open (or drag the `.excalidraw` file in).
-  Save back with File → Save to disk.
-- **VS Code** — install the "Excalidraw" extension and open the file directly.
-- **Obsidian** — the Excalidraw plugin opens these files too.
+## Power distribution
+
+![Power distribution](diagrams/01-power-distribution.svg)
+
+<details>
+<summary>Earlier 8-display design options (02, 03)</summary>
+
+![SDI daisy chain](diagrams/02-sdi-daisy-chain.svg)
+
+![SDI distribution amps](diagrams/03-sdi-distribution-amps.svg)
+
+</details>
+
+## Formats and editing
+
+- **`.excalidraw`** — open at [excalidraw.com](https://excalidraw.com) (File → Open, or
+  drag the file in), in VS Code with the Excalidraw extension, or in Obsidian.
+- **`.drawio`** — open at [app.diagrams.net](https://app.diagrams.net) or in the
+  draw.io desktop app.
+- **`.svg`** — read-only export, embedded above and viewable in any browser.
+
+The formats don't sync with each other: all three are generated from the same
+script, so a hand edit in one format won't appear in the others (or survive a
+regeneration).
 
 ## Regenerating from code
 

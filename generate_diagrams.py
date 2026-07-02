@@ -1,6 +1,8 @@
-"""Generate Excalidraw wiring diagrams for the PCAH video distribution system.
+"""Generate wiring diagrams for the PCAH video distribution system.
 
-Writes .excalidraw JSON files into diagrams/. Uses only the standard library.
+Writes each diagram to diagrams/ in three formats: .excalidraw (editable),
+.drawio (editable in diagrams.net), and .svg (read-only, embedded in the
+README). Uses only the standard library.
 
 Run: python3 generate_diagrams.py
 """
@@ -8,6 +10,7 @@ Run: python3 generate_diagrams.py
 import json
 import random
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 random.seed(20260702)
 
@@ -208,6 +211,161 @@ def validate(diagram):
         missing = [r for r in refs if r not in known]
         if missing:
             raise ValueError(f"element {el['id']} has dangling references: {missing}")
+
+
+def _svg_shape(el):
+    fill = "none" if el["backgroundColor"] == "transparent" else el["backgroundColor"]
+    common = f'fill="{fill}" stroke="{el["strokeColor"]}" stroke-width="{el["strokeWidth"]}"'
+    x, y, w, h = el["x"], el["y"], el["width"], el["height"]
+    if el["type"] == "rectangle":
+        return [f'<rect x="{x:g}" y="{y:g}" width="{w:g}" height="{h:g}" rx="10" {common}/>']
+    cx, cy = x + w / 2, y + h / 2
+    return [f'<ellipse cx="{cx:g}" cy="{cy:g}" rx="{w / 2:g}" ry="{h / 2:g}" {common}/>']
+
+
+def _svg_text(el):
+    parts = []
+    size = el["fontSize"]
+    line_h = size * 1.25
+    lines = el["text"].split("\n")
+    for i, line in enumerate(lines):
+        if el["textAlign"] == "center":
+            x = el["x"] + el["width"] / 2
+            y = el["y"] + el["height"] / 2 + line_h * (i - (len(lines) - 1) / 2)
+            anchor = ' text-anchor="middle" dominant-baseline="central"'
+        else:
+            x = el["x"]
+            y = el["y"] + line_h * i + size * 0.9
+            anchor = ""
+        parts.append(
+            f'<text x="{x:g}" y="{y:g}" font-size="{size}" fill="{el["strokeColor"]}"{anchor}>'
+            f"{escape(line)}</text>"
+        )
+    return parts
+
+
+def _svg_linear(el):
+    pts = " ".join(f"{el['x'] + px:g},{el['y'] + py:g}" for px, py in el["points"])
+    marker = f' marker-end="url(#arrow-{el["strokeColor"][1:]})"' if el["endArrowhead"] else ""
+    return [
+        f'<polyline points="{pts}" fill="none" stroke="{el["strokeColor"]}" '
+        f'stroke-width="{el["strokeWidth"]}"{marker}/>'
+    ]
+
+
+def render_svg(elements):
+    """Standalone SVG document for a diagram's elements (viewable on GitHub)."""
+    xs, ys = [], []
+    for el in elements:
+        xs += [el["x"], el["x"] + el["width"]]
+        ys += [el["y"], el["y"] + el["height"]]
+    x0, y0 = min(xs) - 20, min(ys) - 20
+    w, h = max(xs) - x0 + 20, max(ys) - y0 + 20
+    colors = sorted({el["strokeColor"] for el in elements if el["type"] == "arrow"})
+    markers = "".join(
+        f'<marker id="arrow-{c[1:]}" markerWidth="9" markerHeight="7" refX="8" refY="3.5" '
+        f'orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="{c}"/></marker>'
+        for c in colors
+    )
+    draw = {
+        "rectangle": _svg_shape,
+        "ellipse": _svg_shape,
+        "text": _svg_text,
+        "arrow": _svg_linear,
+        "line": _svg_linear,
+    }
+    body = "".join("".join(draw[el["type"]](el)) for el in elements)
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:g} {y0:g} {w:g} {h:g}" '
+        f'font-family="Helvetica, Arial, sans-serif"><defs>{markers}</defs>'
+        f'<rect x="{x0:g}" y="{y0:g}" width="{w:g}" height="{h:g}" fill="#ffffff"/>{body}</svg>\n'
+    )
+
+
+def _xa(s):
+    """Escape a string for use inside a double-quoted XML attribute."""
+    return escape(s, {'"': "&quot;"})
+
+
+def _drawio_vertex(el, label):
+    geo = (
+        f'<mxGeometry x="{el["x"]:g}" y="{el["y"]:g}" width="{el["width"]:g}" '
+        f'height="{el["height"]:g}" as="geometry"/>'
+    )
+    if el["type"] == "text":
+        style = (
+            f"text;html=1;align=left;verticalAlign=top;"
+            f"fontSize={el['fontSize']};fontColor={el['strokeColor']};"
+        )
+        value = _xa(el["text"]).replace("\n", "&lt;br&gt;")
+    else:
+        shape = "ellipse;" if el["type"] == "ellipse" else "rounded=1;"
+        fill = "none" if el["backgroundColor"] == "transparent" else el["backgroundColor"]
+        style = (
+            f"{shape}whiteSpace=wrap;html=1;fillColor={fill};"
+            f"strokeColor={el['strokeColor']};strokeWidth={el['strokeWidth']};"
+        )
+        value = ""
+        if label:
+            style += f"fontColor={label['strokeColor']};fontSize={label['fontSize']};"
+            value = _xa(label["text"]).replace("\n", "&lt;br&gt;")
+    return (
+        f'<mxCell id="{el["id"]}" value="{value}" style="{style}" vertex="1" parent="1">'
+        f"{geo}</mxCell>"
+    )
+
+
+def _drawio_edge(el, by_id):
+    end = "block" if el["endArrowhead"] else "none"
+    style = (
+        f"edgeStyle=none;rounded=0;html=1;strokeColor={el['strokeColor']};"
+        f"strokeWidth={el['strokeWidth']};endArrow={end};endFill=1;"
+    )
+    pts = [(el["x"] + px, el["y"] + py) for px, py in el["points"]]
+    attrs = ""
+    geo = ['<mxGeometry relative="1" as="geometry">']
+    for binding, point, prefix, role in (
+        (el["startBinding"], pts[0], "exit", "source"),
+        (el["endBinding"], pts[-1], "entry", "target"),
+    ):
+        if binding:
+            attrs += f' {role}="{binding["elementId"]}"'
+            b = by_id[binding["elementId"]]
+            rx = round((point[0] - b["x"]) / b["width"], 3)
+            ry = round((point[1] - b["y"]) / b["height"], 3)
+            style += f"{prefix}X={rx:g};{prefix}Y={ry:g};{prefix}Dx=0;{prefix}Dy=0;"
+        else:
+            geo.append(f'<mxPoint x="{point[0]:g}" y="{point[1]:g}" as="{role}Point"/>')
+    if len(pts) > 2:
+        mids = "".join(f'<mxPoint x="{x:g}" y="{y:g}"/>' for x, y in pts[1:-1])
+        geo.append(f'<Array as="points">{mids}</Array>')
+    geo.append("</mxGeometry>")
+    return (
+        f'<mxCell id="{el["id"]}" style="{style}" edge="1" parent="1"{attrs}>'
+        f"{''.join(geo)}</mxCell>"
+    )
+
+
+def render_drawio(elements, name):
+    """draw.io / diagrams.net document (uncompressed mxGraph XML)."""
+    by_id = {el["id"]: el for el in elements}
+    labels = {el["containerId"]: el for el in elements if el.get("containerId")}
+    cells = ['<mxCell id="0"/>', '<mxCell id="1" parent="0"/>']
+    for el in elements:
+        if el["type"] in ("arrow", "line"):
+            cells.append(_drawio_edge(el, by_id))
+        elif el["type"] == "text" and el.get("containerId"):
+            continue
+        else:
+            cells.append(_drawio_vertex(el, labels.get(el["id"])))
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<mxfile host="app.diagrams.net" type="device">'
+        f'<diagram id="{new_id()}" name="{_xa(name)}">'
+        '<mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" '
+        'connect="1" arrows="1" fold="1" page="0" pageScale="1" math="0" shadow="0">'
+        f"<root>{''.join(cells)}</root></mxGraphModel></diagram></mxfile>\n"
+    )
 
 
 def display_column(d, x, conv_y, tv_y, tv_num):
@@ -462,7 +620,9 @@ def main():
     for name, diagram in diagrams.items():
         validate(diagram)
         diagram.save(out / f"{name}.excalidraw")
-        print(f"wrote diagrams/{name}.excalidraw ({len(diagram.elements)} elements)")
+        (out / f"{name}.svg").write_text(render_svg(diagram.elements))
+        (out / f"{name}.drawio").write_text(render_drawio(diagram.elements, name))
+        print(f"wrote diagrams/{name}.{{excalidraw,svg,drawio}} ({len(diagram.elements)} elements)")
 
 
 if __name__ == "__main__":
