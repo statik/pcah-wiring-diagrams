@@ -1,6 +1,6 @@
-"""Generate wiring diagrams for the PCAH video distribution system.
+"""Generate the wiring diagram for the PCAH video wall.
 
-Writes each diagram to diagrams/ in three formats: .excalidraw (editable),
+Writes the diagram to diagrams/ in three formats: .excalidraw (editable),
 .drawio (editable in diagrams.net), and .svg (read-only, embedded in the
 README). Uses only the standard library.
 
@@ -21,7 +21,6 @@ INK = "#1e1e1e"
 RED = "#e03131"
 BLUE = "#1971c2"
 GREEN = "#2f9e44"
-ORANGE = "#f08c00"
 PURPLE = "#9c36b5"
 PURPLE_BG = "#eebefa"
 GRAY = "#495057"
@@ -368,14 +367,6 @@ def render_drawio(elements, name):
     )
 
 
-def display_column(d, x, conv_y, tv_y, tv_num):
-    """One converter feeding one display over HDMI; returns (converter, tv)."""
-    conv = d.rect(x, conv_y, CONV_W, CONV_H, CONV_LABEL, stroke=PURPLE, bg=PURPLE_BG, font=12)
-    tv = d.rect(x + (CONV_W - TV_W) / 2, tv_y, TV_W, TV_H, f"TV {tv_num}", font=16)
-    d.arrow([bottom(conv), top(tv)], GREEN, start=conv, end=tv)
-    return conv, tv
-
-
 def power_source(d, label, x, y):
     """Label plus a red power-jack circle; returns the circle (center at y + 15)."""
     d.text(x, y + 5, label, size=16, color=INK)
@@ -401,208 +392,74 @@ def legend(d, x, y, entries):
 
 
 def converter_display(d, x, conv_y, tv_y, tv_num):
-    """Converter + display pair: HDMI down to the TV, USB power back up from it."""
+    """Converter + display pair.
+
+    One green run carries HDMI plus the USB-A → USB-C power cable; the
+    arrowhead shows the power draw from the TV into the converter.
+    """
     conv = d.rect(x, conv_y, CONV_W, CONV_H, CONV_LABEL, stroke=PURPLE, bg=PURPLE_BG, font=12)
     tv = d.rect(x + (CONV_W - TV_W) / 2, tv_y, TV_W, TV_H, f"TV {tv_num}", font=16)
-    d.arrow([bottom(conv, -25), top(tv, -25)], GREEN, start=conv, end=tv)
-    d.arrow([top(tv, 25), bottom(conv, 25)], ORANGE, start=tv, end=conv)
+    d.arrow([top(tv), bottom(conv)], GREEN, start=tv, end=conv)
     return conv, tv
 
 
-def power_distribution():
-    """Electric power only: two feeds, three splitters, ten TVs in 3/3/4 clusters."""
-    d = Diagram()
-    d.text(30, 10, "PCAH Video Wall — Power Distribution (10 Displays)", size=24)
-    p1 = power_source(d, "POWER 1", 30, 90)
-    spl_a = d.rect(190, 80, 400, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
-    spl_b = d.rect(830, 80, 420, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
-    d.arrow([right(p1), left(spl_a)], RED, start=p1, end=spl_a)
-    d.arrow([right(spl_a), left(spl_b)], RED, start=spl_a, end=spl_b)
-    p2 = power_source(d, "POWER 2", 30, 410)
-    spl_c = d.rect(190, 400, 600, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
-    d.arrow([right(p2), left(spl_c)], RED, start=p2, end=spl_c)
-
-    clusters = (
-        (spl_a, 200, 1, (140, 320, 500)),
-        (spl_b, 200, 4, (800, 980, 1160)),
-        (spl_c, 520, 7, (140, 320, 500, 680)),
-    )
-    for spl, tv_y, first_num, xs in clusters:
-        for i, x in enumerate(xs):
-            tv = d.rect(x, tv_y, TV_W, TV_H, f"TV {first_num + i}", font=16)
-            d.arrow([(x + TV_W / 2, spl["y"] + spl["height"]), top(tv)], RED, start=spl, end=tv)
-
-    d.text(
-        190,
-        620,
-        "Converters draw power from the TVs' USB ports — see 04-full-system.",
-        size=13,
-        color=GRAY,
-    )
-    legend(
-        d,
-        140,
-        670,
-        [
-            ("line", RED, "POWER"),
-            ("box", GRAY, GRAY_BG, SPLITTER_LABEL),
-            ("box", INK, "transparent", "DISPLAY"),
-        ],
-    )
-    return d
-
-
-def sdi_daisy_chain():
-    d = Diagram()
-    d.text(30, 0, "PCAH Video Wall — SDI Daisy Chain (8 Displays)", size=24)
-    p1 = power_source(d, "POWER 1", 30, 50)
-    p2 = power_source(d, "POWER 2", 30, 110)
-    source = d.rect(40, 230, 150, 70, "SDI SOURCE", stroke=BLUE, bg=BLUE_BG)
-
-    cols = []
-    for row, (conv_y, tv_y) in enumerate(((230, 390), (560, 720))):
-        for i in range(4):
-            cols.append(display_column(d, 260 + 200 * i, conv_y, tv_y, row * 4 + i + 1))
-    convs = [conv for conv, _ in cols]
-
-    d.arrow([right(source), left(convs[0])], BLUE, start=source, end=convs[0])
-    for i in (0, 1, 2, 4, 5, 6):
-        d.arrow([right(convs[i]), left(convs[i + 1])], BLUE, start=convs[i], end=convs[i + 1])
-    d.arrow(
-        [right(convs[3]), (1060, 265), (1060, 485), (200, 485), (200, 595), left(convs[4])],
-        BLUE,
-        start=convs[3],
-        end=convs[4],
-    )
-
-    d.line([right(p1), (925, 65)], RED)
-    d.line([right(p2), (225, 125), (225, 515), (925, 515)], RED)
-    for i in range(4):
-        cx = 325 + 200 * i
-        d.arrow([(cx, 65), (cx, 230)], RED, end=convs[i])
-        d.arrow([(cx, 515), (cx, 560)], RED, end=convs[4 + i])
-
-    legend(
-        d,
-        40,
-        850,
-        [
-            ("line", BLUE, "SDI (INPUT/THROUGH)"),
-            ("line", RED, "POWER"),
-            ("line", GREEN, "HDMI"),
-            ("box", PURPLE, PURPLE_BG, "BLACKMAGIC SDI → HDMI CONVERTER"),
-            ("box", BLUE, BLUE_BG, "SDI SOURCE"),
-            ("box", INK, "transparent", "DISPLAY"),
-        ],
-    )
-    return d
-
-
-def sdi_distribution_amps():
-    d = Diagram()
-    d.text(30, 0, "PCAH Video Wall — SDI Distribution Amps (8 Displays)", size=24)
-    p1 = power_source(d, "POWER 1", 30, 40)
-    p2 = power_source(d, "POWER 2", 30, 95)
-    source = d.rect(40, 175, 150, 60, "SDI SOURCE", stroke=BLUE, bg=BLUE_BG)
-    da1 = d.rect(245, 180, 760, 50, "SDI DISTRIBUTION AMP (1 IN → 4 OUT)", stroke=GRAY, bg=GRAY_BG)
-    da2 = d.rect(245, 560, 760, 50, "SDI DISTRIBUTION AMP (1 IN → 4 OUT)", stroke=GRAY, bg=GRAY_BG)
-
-    d.arrow([right(source), left(da1)], BLUE, start=source, end=da1)
-    d.arrow([right(p1), (300, 55), (300, 180)], RED, start=p1, end=da1)
-    d.arrow([right(p2), (215, 110), (215, 525), (300, 525), (300, 560)], RED, start=p2, end=da2)
-    d.arrow(
-        [right(da1), (1080, 205), (1080, 500), (200, 500), (200, 585), left(da2)],
-        BLUE,
-        start=da1,
-        end=da2,
-    )
-
-    for row, (da, conv_y, tv_y) in enumerate(((da1, 280, 430), (da2, 680, 830))):
-        for i in range(4):
-            cx = 260 + 200 * i + CONV_W / 2
-            conv, _ = display_column(d, 260 + 200 * i, conv_y, tv_y, row * 4 + i + 1)
-            d.arrow([(cx, da["y"] + da["height"]), (cx, conv_y)], BLUE, start=da, end=conv)
-
-    d.text(
-        245,
-        920,
-        "Converter power feeds not shown here — see 01-power-distribution.",
-        size=13,
-        color=GRAY,
-    )
-    legend(
-        d,
-        40,
-        960,
-        [
-            ("line", BLUE, "SDI"),
-            ("line", RED, "POWER"),
-            ("line", GREEN, "HDMI"),
-            ("box", PURPLE, PURPLE_BG, "BLACKMAGIC SDI → HDMI CONVERTER"),
-            ("box", GRAY, GRAY_BG, "SDI DISTRIBUTION AMP"),
-            ("box", INK, "transparent", "DISPLAY"),
-        ],
-    )
-    return d
-
-
-def full_system():
+def video_wall():
     """Power + signal for all ten displays, arranged in 3/3/4 clusters.
 
-    Splitters power the TVs; each converter is powered from its TV's USB port
-    and receives video over a daisy-chained SDI run.
+    Power strips sit below each TV cluster and feed up into the TVs, keeping
+    the red power runs clear of the blue SDI daisy chain, which enters the
+    bottom cluster from the right and runs right to left.
     """
     d = Diagram()
-    d.text(30, 10, "PCAH Video Wall — Full System: Power + SDI Signal (10 Displays)", size=24)
-    p1 = power_source(d, "POWER 1", 30, 90)
-    spl_a = d.rect(270, 80, 440, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
-    spl_b = d.rect(930, 80, 440, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
-    d.arrow([right(p1), left(spl_a)], RED, start=p1, end=spl_a)
-    d.arrow([right(spl_a), left(spl_b)], RED, start=spl_a, end=spl_b)
-    p2 = power_source(d, "POWER 2", 30, 560)
-    spl_c = d.rect(270, 550, 600, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
-    d.arrow([right(p2), left(spl_c)], RED, start=p2, end=spl_c)
+    d.text(30, 10, "PCAH Video Wall — Power + SDI Signal (10 Displays)", size=24)
 
     clusters = (
-        (spl_a, 210, 360, (140, 320, 500)),
-        (spl_b, 210, 360, (800, 980, 1160)),
-        (spl_c, 680, 830, (140, 320, 500, 680)),
+        (210, 360, (140, 320, 500)),
+        (210, 360, (800, 980, 1160)),
+        (680, 830, (140, 320, 500, 680)),
     )
-    convs = []
-    for spl, conv_y, tv_y, xs in clusters:
+    columns = []
+    for conv_y, tv_y, xs in clusters:
         for x in xs:
-            conv, tv = converter_display(d, x, conv_y, tv_y, len(convs) + 1)
-            tv_mid = tv_y + TV_H / 2
-            d.arrow(
-                [(x + 160, spl["y"] + spl["height"]), (x + 160, tv_mid), (x + 125, tv_mid)],
-                RED,
-                start=spl,
-                end=tv,
-            )
-            convs.append(conv)
+            columns.append(converter_display(d, x, conv_y, tv_y, len(columns) + 1))
+    convs = [conv for conv, _ in columns]
+    tvs = [tv for _, tv in columns]
+
+    p1 = power_source(d, "POWER 1", 30, 480)
+    spl_a = d.rect(175, 470, 420, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
+    spl_b = d.rect(835, 470, 420, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
+    d.arrow([right(p1), left(spl_a)], RED, start=p1, end=spl_a)
+    d.arrow([right(spl_a), left(spl_b)], RED, start=spl_a, end=spl_b)
+    p2 = power_source(d, "POWER 2", 30, 950)
+    spl_c = d.rect(175, 940, 600, 50, SPLITTER_LABEL, stroke=GRAY, bg=GRAY_BG)
+    d.arrow([right(p2), left(spl_c)], RED, start=p2, end=spl_c)
+    for tv, spl in zip(tvs, [spl_a] * 3 + [spl_b] * 3 + [spl_c] * 4, strict=True):
+        d.arrow([(tv["x"] + TV_W / 2, spl["y"]), bottom(tv)], RED, start=spl, end=tv)
 
     source = d.rect(5, 215, 110, 60, "SDI SOURCE", stroke=BLUE, bg=BLUE_BG, font=12)
     d.arrow([right(source), left(convs[0])], BLUE, start=source, end=convs[0])
-    for i in (0, 1, 2, 3, 4, 6, 7, 8):
+    for i in range(5):
         d.arrow([right(convs[i]), left(convs[i + 1])], BLUE, start=convs[i], end=convs[i + 1])
     d.arrow(
-        [right(convs[5]), (1350, 245), (1350, 630), (80, 630), (80, 715), left(convs[6])],
+        [right(convs[5]), (1350, 245), (1350, 715), right(convs[9])],
         BLUE,
         start=convs[5],
-        end=convs[6],
+        end=convs[9],
     )
+    for i in (9, 8, 7):
+        d.arrow([left(convs[i]), right(convs[i - 1])], BLUE, start=convs[i], end=convs[i - 1])
 
     legend(
         d,
         40,
-        960,
+        1060,
         [
             ("line", BLUE, "SDI DAISY CHAIN"),
             ("line", RED, "POWER"),
-            ("line", GREEN, "HDMI"),
-            ("line", ORANGE, "USB-A → USB-C (CONVERTER POWER FROM TV)"),
+            ("line", GREEN, "HDMI + USB-C POWER (FROM TV)"),
             ("box", PURPLE, PURPLE_BG, "BLACKMAGIC SDI → HDMI CONVERTER"),
             ("box", GRAY, GRAY_BG, SPLITTER_LABEL),
+            ("box", INK, "transparent", "DISPLAY"),
         ],
     )
     return d
@@ -611,18 +468,13 @@ def full_system():
 def main():
     out = Path(__file__).parent / "diagrams"
     out.mkdir(exist_ok=True)
-    diagrams = {
-        "01-power-distribution": power_distribution(),
-        "02-sdi-daisy-chain": sdi_daisy_chain(),
-        "03-sdi-distribution-amps": sdi_distribution_amps(),
-        "04-full-system": full_system(),
-    }
-    for name, diagram in diagrams.items():
-        validate(diagram)
-        diagram.save(out / f"{name}.excalidraw")
-        (out / f"{name}.svg").write_text(render_svg(diagram.elements))
-        (out / f"{name}.drawio").write_text(render_drawio(diagram.elements, name))
-        print(f"wrote diagrams/{name}.{{excalidraw,svg,drawio}} ({len(diagram.elements)} elements)")
+    diagram = video_wall()
+    validate(diagram)
+    name = "pcah-video-wall"
+    diagram.save(out / f"{name}.excalidraw")
+    (out / f"{name}.svg").write_text(render_svg(diagram.elements))
+    (out / f"{name}.drawio").write_text(render_drawio(diagram.elements, name))
+    print(f"wrote diagrams/{name}.{{excalidraw,svg,drawio}} ({len(diagram.elements)} elements)")
 
 
 if __name__ == "__main__":
