@@ -28,29 +28,26 @@ still opened for editing at [app.diagrams.net](https://app.diagrams.net).
 
 ## Formats and editing
 
-The diagram ships in four formats in `diagrams/`:
-
-- **`pcah-video-wall.excalidraw`** — open at [excalidraw.com](https://excalidraw.com)
-  (File → Open, or drag the file in), in VS Code with the Excalidraw extension,
-  or in Obsidian.
-- **`pcah-video-wall.drawio`** — use the "Open in draw.io" link above, or open
-  the file at [app.diagrams.net](https://app.diagrams.net) / in the draw.io
-  desktop app.
-- **`pcah-video-wall.png`** — downloadable image with the draw.io diagram
-  embedded; drag it into app.diagrams.net to edit.
-- **`pcah-video-wall.svg`** — read-only export, embedded above and viewable in
-  any browser.
-
-## Regenerating from code
-
-All three files are produced by [generate_diagrams.py](generate_diagrams.py)
-(standard library only), which is the easiest way to make structural changes
-like adding a display column or re-spacing a row:
+**`diagrams/pcah-video-wall.drawio` is the source of truth.** Edit it with the
+"Open in draw.io" link above (the GitHub-connected variant commits straight
+back to this repo) or in the draw.io desktop app, then regenerate the derived
+formats:
 
 ```sh
-python3 generate_diagrams.py
+python3 export_diagrams.py
 ```
 
-The formats don't sync with each other: a hand edit in one format won't appear
-in the others (or survive a regeneration), so structural edits belong in the
-script.
+[export_diagrams.py](export_diagrams.py) derives everything else from the
+`.drawio` file:
+
+- **`pcah-video-wall.svg`** — rendered by the draw.io CLI; embedded above.
+- **`pcah-video-wall.png`** — downloadable image with the draw.io diagram
+  embedded, so the PNG itself can be opened for editing at app.diagrams.net.
+- **`pcah-video-wall.excalidraw`** — converted from the draw.io XML for
+  [excalidraw.com](https://excalidraw.com), VS Code (Excalidraw extension), or
+  Obsidian users. Edits made in Excalidraw don't flow back — they'll be
+  overwritten on the next export, so lasting changes belong in the `.drawio`.
+
+The SVG/PNG steps need the [draw.io desktop app](https://www.drawio.com)
+installed; the Excalidraw conversion runs anywhere (Python 3, standard library
+only).
